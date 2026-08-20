@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Phishing mail tracker",
+  "version": "1.0",
+  "description": "Analyses your Gmail inbox and provides insights.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://gmail.googleapis.com/*",
+    "http://localhost:5000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

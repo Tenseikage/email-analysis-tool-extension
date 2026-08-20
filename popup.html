@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 260px;
+      font-family: sans-serif;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    #result {
+      margin-top: 10px;
+      font-weight: bold;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <h3>Gmail Analyser</h3>
+  <button id="btn-analyze">Export emails</button>
+  <button id="btn-switch-account" type="button">Choose Another Google Account</button>
+  <button id="btn-logout" type="button">Logout Gmail</button>
+  <div id="result">Click to connect Gmail.</div>
+  <script src="popup.js"></script>
+</body>
+</html>
