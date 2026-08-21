@@ -16,13 +16,44 @@ function downloadJson(data, fileName) {
 }
 
 const SERVER_URL = "http://localhost:5000";
+const NATIVE_HOST_NAME = "com.email_analysis.server";
+
+function startServer() {
+  return new Promise((resolve, reject) => {
+    const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+
+    port.onMessage.addListener((message) => {
+      port.disconnect();
+      if (message.ok) {
+        resolve(message);
+      } else {
+        reject(new Error(message.error || "Impossible de démarrer le serveur"));
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      }
+    });
+
+    port.postMessage({ action: "start-server" });
+  });
+}
 
 async function openServerLogin() {
   await chrome.tabs.create({ url: `${SERVER_URL}/login` });
 }
 
 async function fetchServerEmails() {
-  const response = await fetch(`${SERVER_URL}/emails`);
+  let response;
+  try {
+    response = await fetch(`${SERVER_URL}/emails`);
+  } catch (error) {
+    throw new Error(
+      "Serveur inaccessible. Vérifiez que l’hôte natif est installé et que server.py démarre."
+    );
+  }
   const data = await response.json();
 
   if (!response.ok) {
@@ -107,9 +138,11 @@ async function fetchInboxMessages(token) {
 
 document.getElementById("btn-analyze").addEventListener("click", async () => {
   const resultDiv = document.getElementById("result");
-  resultDiv.textContent = "Connecting to Gmail…";
+  resultDiv.textContent = "Starting local server…";
 
   try {
+    await startServer();
+    resultDiv.textContent = "Connecting to Gmail…";
     const data = await fetchServerEmails();
     downloadJson(data, "emails.json");
     resultDiv.textContent = `Export OK : ${data.total} mails (${data.read} read / ${data.unread} unread)`;

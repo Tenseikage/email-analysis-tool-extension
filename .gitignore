@@ -16,4 +16,7 @@ gmail_credentials.json
 
 # Fichiers générés localement
 emails.json
+native_host_config.json
+native_host_manifest.json
+email-analysis-host.spec
 

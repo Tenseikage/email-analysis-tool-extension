@@ -1,0 +1,9 @@
+{
+  "name": "com.email_analysis.server",
+  "description": "Starts the email analysis Flask server",
+  "path": "C:\\PATH\\TO\\email-analysis-host.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://hmkjbiiebpbjchodijmhabikcfanamgd/"
+  ]
+}
