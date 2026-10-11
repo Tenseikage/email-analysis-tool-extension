@@ -27,7 +27,7 @@ function startServer() {
       if (message.ok) {
         resolve(message);
       } else {
-        reject(new Error(message.error || "Impossible de démarrer le serveur"));
+        reject(new Error(message.error || "Unable to start the server."));
       }
     });
 
@@ -51,13 +51,25 @@ async function fetchServerEmails() {
     response = await fetch(`${SERVER_URL}/emails`);
   } catch (error) {
     throw new Error(
-      "Serveur inaccessible. Vérifiez que l’hôte natif est installé et que server.py démarre."
+      "Server unavailable. Check that the native host is installed and that server.py is running."
     );
   }
-  const data = await response.json();
+  const contentType = response.headers.get("content-type") || "";
+  let data;
+
+  if (contentType.includes("application/json")) {
+    data = await response.json();
+  } else {
+    const responseText = await response.text();
+    throw new Error(
+      `Unexpected server response (${response.status}). ${
+        responseText.slice(0, 160) || "No details available."
+      }`
+    );
+  }
 
   if (!response.ok) {
-    const error = new Error(data.details || data.error || "Authentification Gmail requise");
+    const error = new Error(data.details || data.error || "Gmail Authentification needed");
     error.code = response.status;
     throw error;
   }
@@ -77,7 +89,7 @@ async function fetchInboxMessages(token) {
 
   if (!listResponse.ok) {
     const errorText = await listResponse.text();
-    throw new Error(`Erreur Gmail API: ${listResponse.status} - ${errorText}`);
+    throw new Error(`Gmail API Error: ${listResponse.status} - ${errorText}`);
   }
 
   const listData = await listResponse.json();
@@ -85,11 +97,11 @@ async function fetchInboxMessages(token) {
 
   const result = {
     total: 0,
-    read: 0,
-    unread: 0,
+    read_count: 0,
+    unread_count: 0,
     read: [],
     unread: [],
-    all: [],
+    all: []
   };
 
   for (const message of messages) {
@@ -125,15 +137,24 @@ async function fetchInboxMessages(token) {
 
     if (isRead) {
       result.read.push(email);
-      result.read += 1;
+      result.read_count += 1;
     } else {
       result.unread.push(email);
-      result.unread += 1;
+      result.unread_count += 1;
     }
   }
 
   result.total = result.all.length;
   return result;
+}
+
+async function analyzeEmailWithAI(emailText) {
+  const response = await fetch(`${SERVER_URL}/ai/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: emailText })
+  });
+  return await response.json();
 }
 
 document.getElementById("btn-analyze").addEventListener("click", async () => {
@@ -145,7 +166,7 @@ document.getElementById("btn-analyze").addEventListener("click", async () => {
     resultDiv.textContent = "Connecting to Gmail…";
     const data = await fetchServerEmails();
     downloadJson(data, "emails.json");
-    resultDiv.textContent = `Export OK : ${data.total} mails (${data.read} read / ${data.unread} unread)`;
+    resultDiv.textContent = `Export OK : ${data.total} mails (${data.read_count} read / ${data.unread_count} unread)`;
   } catch (error) {
     if (error.code === 401) {
       await openServerLogin();
@@ -182,4 +203,3 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
     resultDiv.textContent = "Error signing out of Gmail: " + error.message;
   }
 });
-

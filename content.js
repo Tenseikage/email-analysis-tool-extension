@@ -1,6 +1,6 @@
-// Exemple d'extraction de l'adresse de l'expéditeur dans le DOM de Gmail
+// Example of extracting the sender's email address from the Gmail DOM
 function getSenderEmail() {
-  // Sélectionne l'élément contenant l'adresse e-mail dans l'interface Gmail
+  // Select the span element that contains the email address of the sender
   const senderElement = document.querySelector('span[email]');
   if (senderElement) {
     const email = senderElement.getAttribute('email');
@@ -10,10 +10,18 @@ function getSenderEmail() {
   return null;
 }
 
-// Écoute les messages envoyés par le pop-up de l'extension
+// content.js : extract the email body from the Gmail interface
+function getEmailBody() {
+  const bodyElement = document.querySelector('div[role="main"] .a3s');
+  return bodyElement ? bodyElement.innerText : "";
+}
+
+// Listen for messages from the popup script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "ANALYZE_MAIL") {
-    const senderEmail = getSenderEmail();
-    sendResponse({ email: senderEmail });
+    sendResponse({ 
+      email: getSenderEmail(), 
+      text: getEmailBody() 
+    });
   }
 });
