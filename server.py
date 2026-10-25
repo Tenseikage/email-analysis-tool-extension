@@ -86,6 +86,13 @@ def save_credentials(creds):
     with CREDENTIALS_FILE.open("w", encoding="utf-8") as f:
         json.dump(json.loads(creds.to_json()), f, ensure_ascii=False, indent=2)
 
+
+def save_email_export(export):
+    """Replace the local export with the result of the current Gmail query."""
+    with OUTPUT_FILE.open("w", encoding="utf-8") as f:
+        json.dump(export, f, ensure_ascii=False, indent=2)
+
+
 def extract_email_address(sender_str):
     """Extracts the email address from a sender string."""
     if not sender_str:
@@ -158,26 +165,61 @@ def emails():
         return jsonify({"error": "Gmail credentials not found. Please log in."}), 401
     try:
         service = build("gmail", "v1", credentials=creds)
-        # 1.Obtain the last 50 emails from the user's inbox
-        list_response = service.users().messages().list(userId="me", labelIds=["INBOX"], maxResults=50).execute()
-        messages_refs = list_response.get("messages", [])
+        # 1. Obtain all unread emails from the user's inbox.
+        messages_refs = []
+        page_token = None
+        while True:
+            list_request = service.users().messages().list(
+                userId="me",
+                q='is:inbox is:unread category:primary',
+                maxResults=100,
+                pageToken=page_token,
+            )
+            list_response = list_request.execute()
+            messages_refs.extend(list_response.get("messages", []))
+            page_token = list_response.get("nextPageToken")
+            if not page_token:
+                break
         if not messages_refs:
-            return jsonify({"emails": [], "total": 0, "read_count": 0, "unread_count": 0})
+            export = {
+                "all": [],
+                "total": 0,
+                "read_count": 0,
+                "unread_count": 0,
+            }
+            save_email_export(export)
+            return jsonify(export)
         fetched_details = []
         # 2. Callback executed for each email to fetch its details
-        def fetch_email_details(requesti_id,response, exception):
+        def fetch_email_details(request_id, response, exception):
             if exception is not None:
-                fetched_details.append({"id": requesti_id, "error": str(exception)})
-        # 3. Batch request to fetch email details (Batch httpRequest) : 1 http request instead of 50
-        batch = service.new_batch_http_request(callback=fetch_email_details)
-        for msg_ref in messages_refs:
-            batch.add(service.users().messages().get(userId="me", 
-                id=msg_ref["id"], 
-                format="metadata", metadataHeaders=["Subject", "From", "To", "Date","Authentication-Results"]))
-        batch.execute()
+                app.logger.warning(
+                    "Unable to retrieve Gmail message %s: %s",
+                    request_id,
+                    exception,
+                )
+                return
+            fetched_details.append(response)
+        # 3. Fetch details in batches to stay within Gmail batch limits.
+        for start in range(0, len(messages_refs), 50):
+            batch = service.new_batch_http_request(callback=fetch_email_details)
+            for msg_ref in messages_refs[start:start + 50]:
+                batch.add(service.users().messages().get(
+                    userId="me",
+                    id=msg_ref["id"],
+                    format="metadata",
+                    metadataHeaders=[
+                        "Subject",
+                        "From",
+                        "To",
+                        "Date",
+                        "Authentication-Results",
+                    ],
+                ))
+            batch.execute()
         # 4. Process the fetched details to extract relevant information
         export = {
-            "total": len(fetched_details),
+            "total": 0,
             "read_count": 0,
             "unread_count": 0,
             "all": [],
@@ -195,14 +237,13 @@ def emails():
                 "read": is_read,
                 "status": "read" if is_read else "unread",
             }
-            export["all"].append(item)
             if is_read:
-                export["read_count"] += 1
-            else:
-                export["unread_count"] += 1
+                continue
+            export["all"].append(item)
+            export["unread_count"] += 1
+        export["total"] = len(export["all"])
         # 5. Save the export to a local JSON file
-        with OUTPUT_FILE.open("w", encoding="utf-8") as f:
-            json.dump(export, f, ensure_ascii=False, indent=2)
+        save_email_export(export)
         return jsonify(export)
     except Exception as error:
         return jsonify({"error": f"Error while retrieving mails : {str(error)}"}), 502
